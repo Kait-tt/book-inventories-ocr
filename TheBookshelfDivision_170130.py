@@ -179,117 +179,128 @@ GOOGLE_CLOUD_VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate?
 API_KEY = "AIzaSyDPv1cYnwwjxAlw4uy0aPhu9634sh7LxRM"
 
 
-def ocrAndLevenshitein():
+def ocrAndLevenshitein(save_img=False):
     start3 = time.time()
 
-    LevenshteinDistanceBox2 = []
-    LDAndtitle2Box = []
-    stageAndfragmentImages, stageAndfragmentPositions = myHough2()
+    stageAndfragmentImages, stageAndfragmentPositions = myHough2(save_img)
+    print("end hough: {:.4}".format(time.time() - start3))
+
+    # 全ての本画像をBase64にエンコードし、リクエストオブジェクトを作る
+    start4 = time.time()
+    stage_idxes = []
+    items_idxes = []
+    request_objects = []
     for i, fragmentImage in enumerate(stageAndfragmentImages):
-        LDAndtitle1Box = []
-        LevenshteinDistanceBox1 = []
         for j, img in enumerate(fragmentImage):
+            stage_idxes.append(i)
+            items_idxes.append(j)
             cv2.imwrite('image2.jpg', img)
             infile = open('image2.jpg', 'rb')
             stream = infile.read()
             infile.close()
-            api_url = GOOGLE_CLOUD_VISION_API_URL + API_KEY
-            start4 = time.time()
-            req_body = json.dumps({
-                'requests': [{
-                    'image': {
-                        'content': str(base64.b64encode(stream).decode("utf-8"))
-                    },
-                    'features': [{
-                        'type': 'TEXT_DETECTION',
-                        'maxResults': 1
-                    }],
-                    'imageContext': {
-                        'languageHints': ['ja']
-                    }
-                }]
+            base64image = str(base64.b64encode(stream).decode("utf-8"))
+            request_objects.append({
+                'image': {
+                    'content': base64image
+                },
+                'features': [{
+                    'type': 'TEXT_DETECTION',
+                    'maxResults': 1
+                }],
+                'imageContext': {
+                    'languageHints': ['ja']
+                }
             })
+
+    print("end base64 encoding: {:.4}".format(time.time() - start4))
+
+    # 画像をできるだけまとめてAPIに送る
+    start5 = time.time()
+    # https://cloud.google.com/vision/limits
+    LIMIT_BYTES = int(8 * 1024 * 1024 / 2)  # Max: 8MB
+    LIMIT_BATCH = 16  # Max: 16
+    api_url = GOOGLE_CLOUD_VISION_API_URL + API_KEY
+    responses = []
+    send_request_objects = []
+    pos = 0
+    while pos < len(request_objects):
+        tmp_send_request_objects = send_request_objects.copy()
+        tmp_send_request_objects.append(request_objects[pos])
+        req_body = json.dumps({'requests': tmp_send_request_objects})
+        if len(req_body) > LIMIT_BYTES or len(tmp_send_request_objects) > LIMIT_BATCH:
+            if len(send_request_objects) == 0:  # 画像が大きすぎて送れない
+                raise Exception('{}s image is too large.'.format(pos))
+
+            req_body = json.dumps({'requests': send_request_objects})
+            # print('request {} images'.format(len(send_request_objects)))
             res = requests.post(api_url, data=req_body)
             read_json = res.json()
-            # elapsed_time4 = time.time() - start4
-            # print("{0}".format(elapsed_time4))
-            # pprint.pprint(res.json())
+            # read_json = {'responses': [{} for i in range(len(send_request_objects))]}  # stub
+            responses.extend(read_json['responses'])
+            send_request_objects = []
+        else:
+            send_request_objects = tmp_send_request_objects
+            pos += 1
 
-            # # JSONファイル書き出し
-            # with open("./testJSON/naname/json" + str(i) + ";" + str(j) + ".json", 'w') as f:
-            #     json.dump(read_json, f, sort_keys=True, indent=4)
-            #
-            # # JSONファイル読み込み
-            # with open("./testJSON/naname/json" + str(i) + ";" + str(j) + ".json", 'r') as f:
-            #     read_json = json.load(f)
+    if len(send_request_objects) > 0:
+        req_body = json.dumps({'requests': send_request_objects})
+        # print('request {} images'.format(len(send_request_objects)))
+        res = requests.post(api_url, data=req_body)
+        read_json = res.json()
+        # read_json = {'responses': [{} for i in range(len(send_request_objects))]}  # stub
+        responses.extend(read_json['responses'])
 
+    print("end api request: {:.4}".format(time.time() - start5))
 
-            # pprint.pprint(read_json)
-            # pprint.pprint(res.json())
-            read_description = {}
-            # start5 = time.time()
-            if "textAnnotations" in read_json["responses"][0]:
+    # OCRの結果を取り出して編集距離を計算する
+    start6 = time.time()
+    LDAndtitleBox = []
+    for i, response in enumerate(responses):
+        if "textAnnotations" in response:
+            read_textAnnotations = response["textAnnotations"][0]
+            read_description = read_textAnnotations["description"]
+            LevenshteinDistanceTempBox = []
+            some_title = read_description.split("\n")
+            some_title.pop(-1)
+            # some_title.append(description)  # 複数タイトルがある場合区切る
+            MinValue = 400
+            MinValueKey = -1
+            for k, title, in enumerate(some_title):
+                LevenshteinDistanceTempBox.append(Levenshtein.distance(title, target_title))
+                if Levenshtein.distance(title, target_title) < MinValue:
+                    MinValue = Levenshtein.distance(title, target_title)
+                    MinValueKey = k
+            LDAndtitleBox.append({"stage": stage_idxes[i], "item": items_idxes[i],
+                                  "distance": MinValue, "title": some_title[MinValueKey]})
 
-                read_responses = read_json["responses"][0]
-                read_textAnnotations = read_responses["textAnnotations"][0]
-                read_description = read_textAnnotations["description"]
-
-                # pprint.pprint(str(i) + ',' + str(j) + ',' + read_description)
-                # if len(read_description) >= 2:
-
-                LevenshteinDistanceTempBox = []
-                LDAndtitleTempBox = []
-                # for k, description, in enumerate(read_description):
-                some_title = read_description.split("\n")
-                some_title.pop(-1)
-                # pprint.pprint(some_title)
-                # some_title.append(description)  # 複数タイトルがある場合区切る
-                MinValue = 400
-                MinValueKey = -1
-                for k, title, in enumerate(some_title):
-                    # LDAndtitleTempBox.append({"distance_": Levenshtein.distance(title, target_title), "title": title})
-                    LevenshteinDistanceTempBox.append(Levenshtein.distance(title, target_title))
-                    if Levenshtein.distance(title, target_title) < MinValue:
-                        MinValue = Levenshtein.distance(title, target_title)
-                        MinValueKey = k
-                LDAndtitle1Box.append({"distance_": MinValue, "title": some_title[MinValueKey]})
-                # LevenshteinDistanceBox1.append(min(LevenshteinDistanceTempBox))
-
-
-            else:
-                LDAndtitle1Box.append({"distance_": 400, "title": "null"})
-                # LevenshteinDistanceBox1.append(400)
-                # elapsed_time5 = time.time() - start5
-                # print("{0}".format(elapsed_time5))
-        LDAndtitle2Box.append(LDAndtitle1Box)
-
-        # LevenshteinDistanceBox2.append(LevenshteinDistanceBox1)
+        else:
+            LDAndtitleBox.append({"stage": stage_idxes[i], "item": items_idxes[i],
+                                  "distance": 400, "title": "null"})
 
     # pprint.pprint("XXX")
     # pprint.pprint(LDAndtitle2Box)
     # pprint.pprint(LevenshteinDistanceBox2)
 
-    LDAndtitlelist = []
+    # 上からいくつか抽出
+    # start6 = time.time()
     pointlist = []
     distancelist = []
     titlelist = []
-    # start6 = time.time()
-    for i, dan in enumerate(LDAndtitle2Box):
-        for j, item in enumerate(dan):
-            d = LDAndtitle2Box[i][j]["distance_"]
-            # pprint.pprint(d)
-            t = LDAndtitle2Box[i][j]["title"]
-            LDAndtitlelist.append({"i": i, "j": j, "distance": d, "title": t})
-    LDAndtitlelist.sort(key=lambda x: x["distance"])
+    LDAndtitleBox.sort(key=lambda x: x["distance"])
     for k in range(6):
-        stage = LDAndtitlelist[k]["i"]
-        item = LDAndtitlelist[k]["j"]
-        distancelist.append(LDAndtitlelist[k]["distance"])
+        stage = LDAndtitleBox[k]["stage"]
+        item = LDAndtitleBox[k]["item"]
+        distancelist.append(LDAndtitleBox[k]["distance"])
         pointlist.append(stageAndfragmentPositions[stage][item])
-        titlelist.append(LDAndtitlelist[k]["title"])
+        titlelist.append(LDAndtitleBox[k]["title"])
     # pprint.pprint(pointlist)
     # pprint.pprint(distancelist)
     # pprint.pprint(titlelist)
+
+    print("end Levenshtein: {:.4}".format(time.time() - start6))
+
+    # 結果の画像を生成
+    start7 = time.time()
     for l in range(len(pointlist) - 1):
         x1 = pointlist[l]["x1"]
         y1 = pointlist[l]["y1"]
@@ -323,7 +334,10 @@ def ocrAndLevenshitein():
         #     surroundedimage = cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 6)
         #     cv2.imwrite('./images/surroundedimage/' + str(l) + ".jpg", surroundedimage)
 
+    print("end Result Image: {:.4}".format(time.time() - start7))
 
-# ocrAndLevenshitein()
+    print("end All: {:.4}".format(time.time() - start3))
 
-myHough2()
+ocrAndLevenshitein()
+
+# myHough2()
