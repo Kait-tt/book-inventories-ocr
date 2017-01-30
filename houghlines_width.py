@@ -1,24 +1,27 @@
 # -*- coding: utf-8 -*-
+"""
+Created on Mon Oct 24 14:55:51 2016
+
+@author: s1321168
+"""
+
+# -*- coding: utf-8 -*-
 
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import interactive
-from matplotlib.font_manager import FontProperties
 
-X_THRESHOLD = 40  # px
-Y_THRESHOLD = 80  # px
+X_THRESHOLD = 20  # px
+Y_THRESHOLD = 40  # px
 
 interactive(True)
 
 
-# 各列にいくつ黒要素があるかカウントする
-# tw: 列の幅
 def countBlack(ary, tw=2):
-    ary = cv2.imread('./images/BI12_iso800tri.jpg')
     h, w = ary.shape[:2]
     minh = int(h / 3 * 1)
-    maxh = int(h / 3 * 2)
+    maxh = int(w / 3 * 2)
     cnts = []
     for sx in range(0, w - tw):
         cnt = 0
@@ -28,9 +31,7 @@ def countBlack(ary, tw=2):
         cnts.append(cnt)
     return cnts
 
-
-# 
-def detectPeek(ary, pw=20):
+def detectPeek(ary, pw=10):
     peeks = []
     for i in range(len(ary) - pw):
         if all([ary[i - j] <= ary[i] for j in range(-pw, pw + 1) if j != 0]):
@@ -47,10 +48,10 @@ def removeNotPeekArea(ary, peeks, pw=2):
                 for y in range(h):
                     ary2[y][x + tx] = ary[y][x + tx]
     return ary2
-    
+
 
 def myhough(threshold, minLineLength, maxLineGap):
-    img = cv2.imread('./images/BI12_iso800triro.jpg')
+    img = cv2.imread("./images/Book_Inventories_width.JPG")
     h, w = img.shape[:2]
 
     # gray scale
@@ -59,49 +60,48 @@ def myhough(threshold, minLineLength, maxLineGap):
     # scale out
     scale = 0.5
     gray = cv2.resize(gray, (int(w * scale), int(h * scale)))
-
+    
+    
     # canny
     edges = cv2.Canny(gray, 100, 150, apertureSize=3)
     # cv2.imshow("canny2", edges)
     cv2.imshow("canny2", cv2.resize(edges, (w, h)))
-
+    
+    
     # detect peek
     cnts = countBlack(edges, tw=2)
     peeks = detectPeek(cnts, pw=int(20*scale))
-    fp = FontProperties(fname=r'C:\WINDOWS\Fonts\YuGothic.ttf')
     plt.plot(range(0, len(cnts)), cnts)
     plt.plot(peeks, [cnts[x] for x in peeks], 'o')
-    plt.xlim(0, 4072)
-    plt.xlabel(u'画像の幅(ピクセル)', fontproperties=fp)
-    plt.ylabel(u'黒の数(個)', fontproperties=fp)
-    plt.savefig("graph.png")
-
+    plt.show()
+    
+    
     # remove not peek area
     edges = removeNotPeekArea(edges, peeks, pw=2)
     # cv2.imshow("remove not peek area", edges)
     cv2.imshow("remove not peek area", cv2.resize(edges, (w, h)))
-
+    
     # hough
     lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold, minLineLength=minLineLength, maxLineGap=maxLineGap)
     if lines is None:
         print('lines not found')
         return
-
+        
     # draw hough lines only vertically line
     for line in lines:
         x1, y1, x2, y2 = [int(a / scale) for a in line[0]]
         if abs(x1 - x2) < X_THRESHOLD / 180 * np.pi and abs(y1 - y2) > Y_THRESHOLD:
-            cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 3)
+            cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 7)
 
     # draw peek lines
     for x in [int(x / scale) for x in peeks]:
-        cv2.line(img, (x, 0), (x, h), (0, 0, 255), 2)
+        cv2.line(img, (x, 0), (x, h), (0, 0, 255), 4)
 
     cv2.imshow("threshold:{0}, minLineLength:{1}, maxLineGap:{2}".format(threshold, minLineLength, maxLineGap), img)
-    cv2.imwrite("./images/170111.jpg", img)
-    
-
-myhough(5, 10, 50)
+        
+    cv2.imwrite("./images/BI_n2.jpg",img)
+myhough(5, 100, 30)
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+

@@ -1,0 +1,62 @@
+# -*- coding: utf-8 -*-
+
+import requests
+import json
+import base64
+import os
+
+GOOGLE_CLOUD_VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate?key='
+API_KEY = "AIzaSyBS7bWxSy9w1YhRwcRZmUX9JqxdecWRMMU"
+def goog_cloud_vison (image_content):
+    api_url = GOOGLE_CLOUD_VISION_API_URL + API_KEY
+    req_body = json.dumps({
+        'requests': [{
+            'image': {
+                'content': str(base64.b64encode(image_content).decode("utf-8"))
+            },
+            'features': [{
+                'type': 'TEXT_DETECTION',
+                'maxResults': 10
+            }]
+        }]
+    })
+    res = requests.post(api_url, data=req_body)
+    return res.json()
+
+def img_to_base64(filepath):
+    with open(filepath, 'rb') as img:
+        img_byte = img.read()
+    return base64.b64encode(img_byte)
+
+def get_descs_from_return(res_json):
+    print(res_json)
+    labels = res_json['responses'][0]['textAnnotations']
+    descs = []
+    for value in labels:
+        descs.append(value['description'])
+
+    return json.dumps(descs)
+
+def update_json_file(json_desc):
+    fname = '/tmp/descs.json'
+    if os.path.isfile(fname)==True:
+        with open('/tmp/descs.json', 'r') as f:
+            f_desc = json.load(f)
+    else:
+        f_desc = ''
+
+    if json_desc != f_desc:
+        with open('/tmp/descs.json', 'w') as f:
+            json.dump(json_desc, f, sort_keys=True, indent=4)
+        return True
+    else:
+        return False
+
+#
+# main
+#
+img = img_to_base64('sample.jpg')
+res_json = goog_cloud_vison(img)
+json_desc = get_descs_from_return(res_json)
+print(json_desc)
+update_json_file(json_desc)

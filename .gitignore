@@ -1,0 +1,10 @@
+images/
+*.txt
+*.jpg
+*.json
+*.csv
+*.pickle
+*コピー*
+編集距離.py
+*元.py
+.idea/

@@ -1,15 +1,9 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Aug 30 13:42:56 2016
-
-@author: s1321168
-"""
-
 
 import cv2
 import numpy as np
 
-img = cv2.imread("C:/image/Book_Inventories.JPG")
+img = cv2.imread("./images/Book_Inventories_width.JPG")
 gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 edges = cv2.Canny(gray,90,200,apertureSize = 3)
 
@@ -26,6 +20,6 @@ for rho,theta in lines[0]:
 
     cv2.line(img,(x1,y1),(x2,y2),(0,0,255),2)
 
-cv2.imwrite("C:/image/BIedeges90_200.jpg",edges)
+cv2.imwrite("./images/BIedeges.jpg",img)
 
 #cv2.imwrite("C:/image/BI4.jpg",img)
