@@ -44,7 +44,7 @@ def countWhite(orig, tw=2):
     return cnts2
 
 
-def myHough1():
+def myHough1(save_img=False):
     start1 = time.time()
     img = Image.open(entry_image)
     # 90°回転
@@ -52,21 +52,17 @@ def myHough1():
     img90 = cv2.cvtColor(np.array(img90PIL), cv2.COLOR_RGB2BGR)
     lineimg1 = img90
 
-    print("elapsed_time1:{0}".format(time.time() - start1))
-
     # 高さと幅の取得
     h, w = img90.shape[:2]
 
     # gray scale
     gray = cv2.cvtColor(img90, cv2.COLOR_BGR2GRAY)
-    print("elapsed_time2:{0}".format(time.time() - start1))
 
     # canny
     Lowthre = 100
     Highthre = 150
     edges = cv2.Canny(gray, Lowthre, Highthre, apertureSize=3)
     cv2.imwrite('./images/cannyimages/' + str(Lowthre) + ',' + str(Highthre) + ',' + ',' + ".jpg", edges)
-    print("elapsed_time3:{0}".format(time.time() - start1))
 
     # detect peek
     cnts = countWhite(edges, tw=2)
@@ -76,7 +72,6 @@ def myHough1():
     divideLines = []
     divideImages = []
     divw = 10
-    print("elapsed_time4:{0}".format(time.time() - start1))
 
     for x in range(w - divw - 1):
         if cnts[x] < divideBorder and all([cnts[tx] > divideBorder for tx in range(x + 1, x + divw)]):
@@ -85,26 +80,27 @@ def myHough1():
         # if divideLines is not None:
         divideLines.insert(0, 0)
         divideLines.append(w)
-    print("elapsed_time5:{0}".format(time.time() - start1))
 
     # dvidelines
     for x in range(len(divideLines) - 1):
         divide_img = img90[0:h, divideLines[x]:divideLines[x + 1]]
         divideImages.append(divide_img)
-        cv2.line(lineimg1, (divideLines[x], 0), (divideLines[x], h), (0, 0, 255), 8)
+        if save_img:
+            cv2.line(lineimg1, (divideLines[x], 0), (divideLines[x], h), (0, 0, 255), 8)
+            cv2.imwrite('./images/myhough1/' + str(x) + '.jpg', divide_img)
+
+    if save_img:
         cv2.imwrite('./images/lineimages/' + str(Lowthre) + ',' + str(Highthre) + ',' + ".jpg", lineimg1)
-        cv2.imwrite('./images/myhough1/' + str(x) + '.jpg', divide_img)
     # print(np1)
     # elapsed_time1 = time.time() - start1
     # print("elapsed_time1:{0}".format(elapsed_time1))
-    print("elapsed_time6:{0}".format(time.time() - start1))
 
     return divideImages, divideLines
 
 
-def myHough2():
+def myHough2(save_img=False, save_pickle=False):
     # start2 = time.time()
-    stageImages, stagePositions = myHough1()
+    stageImages, stagePositions = myHough1(save_img=save_img)
 
     # MY_HOUGH1 = "./images/myHough1"
     # for infile in glob.glob(os.path.join(MY_HOUGH1, "*.jpg")):
@@ -127,7 +123,8 @@ def myHough2():
         Lowthre = 100
         Highthre = 150
         edges = cv2.Canny(gray, Lowthre, Highthre, apertureSize=3)
-        cv2.imwrite('./images/cannyimages/' + str(Lowthre) + ',' + str(Highthre) + ',' + str(i) + ".jpg", edges)
+        if save_img:
+            cv2.imwrite('./images/cannyimages/' + str(Lowthre) + ',' + str(Highthre) + ',' + str(i) + ".jpg", edges)
 
         # detect peek
         h, w = img270.shape[:2]
@@ -159,13 +156,19 @@ def myHough2():
             fragmentPos['x2'] = divideLines2[y + 1]
             fragmentPos['y2'] = stagePositions[i + 1]
             fragmentPositions.append(fragmentPos)
+
         stageAndfragmentImages.append(fragmentImages)
         stageAndfragmentPositions.append(fragmentPositions)
-        cv2.imwrite('./images/lineimages/' + str(Lowthre) + ',' + str(Highthre) + ',' + str(i) + ".jpg", lineimg2)
-        f = open('stageAndfragmentImages_naname.pickle', 'wb')
-        pickle.dump(stageAndfragmentImages, f)
-        f = open('stageAndfragmentPositions_naname.pickle', 'wb')
-        pickle.dump(stageAndfragmentPositions, f)
+        if save_pickle:
+            # TODO: 上書きして大丈夫なのか
+            f = open('stageAndfragmentImages_naname.pickle', 'wb')
+            pickle.dump(stageAndfragmentImages, f)
+            f = open('stageAndfragmentPositions_naname.pickle', 'wb')
+            pickle.dump(stageAndfragmentPositions, f)
+
+        if save_img:
+            cv2.imwrite('./images/lineimages/' + str(Lowthre) + ',' + str(Highthre) + ',' + str(i) + ".jpg", lineimg2)
+
     # elapsed_time2 = time.time() - start2
     # print("elapsed_time2:{0}".format(elapsed_time2))
     return stageAndfragmentImages, stageAndfragmentPositions
@@ -323,4 +326,4 @@ def ocrAndLevenshitein():
 
 # ocrAndLevenshitein()
 
-myHough1()
+myHough2()
