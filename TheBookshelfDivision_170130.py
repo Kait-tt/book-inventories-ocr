@@ -77,7 +77,6 @@ def myHough1():
     divideImages = []
     divw = 10
     print("elapsed_time4:{0}".format(time.time() - start1))
-    return
 
     for x in range(w - divw - 1):
         if cnts[x] < divideBorder and all([cnts[tx] > divideBorder for tx in range(x + 1, x + divw)]):
