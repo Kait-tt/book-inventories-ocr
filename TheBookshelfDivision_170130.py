@@ -45,12 +45,12 @@ def countWhite(orig, tw=2):
 
 
 def myHough1(save_img=False):
-    start1 = time.time()
+    # start1 = time.time()
     img = Image.open(entry_image)
     # 90°回転
     img90PIL = img.transpose(Image.ROTATE_90)
     img90 = cv2.cvtColor(np.array(img90PIL), cv2.COLOR_RGB2BGR)
-    lineimg1 = img90
+    lineimg1 = img90.copy()
 
     # 高さと幅の取得
     h, w = img90.shape[:2]
